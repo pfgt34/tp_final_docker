@@ -3,25 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>TD Docker - Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>TD Docker - Items</title>
     <style>
-      :root {
-        --primary: #6366f1;
-        --primary-dark: #4f46e5;
-        --success: #10b981;
-        --danger: #ef4444;
-        --bg: #0f172a;
-        --bg-card: #1e293b;
-        --bg-hover: #334155;
-        --text: #f1f5f9;
-        --text-muted: #94a3b8;
-        --border: #334155;
-        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-      }
-      
       * {
         margin: 0;
         padding: 0;
@@ -29,147 +12,93 @@
       }
       
       body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        min-height: 100vh;
-        line-height: 1.6;
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        color: #333;
+        padding: 20px;
       }
       
       .container {
-        max-width: 900px;
+        max-width: 800px;
         margin: 0 auto;
-        padding: 2rem;
-      }
-      
-      header {
-        text-align: center;
-        margin-bottom: 3rem;
-      }
-      
-      .logo {
-        font-size: 3rem;
-        margin-bottom: 0.5rem;
       }
       
       h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, var(--primary), #a855f7);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #2c3e50;
+        margin-bottom: 10px;
       }
       
       .subtitle {
-        color: var(--text-muted);
-        font-size: 1rem;
+        color: #666;
+        margin-bottom: 30px;
       }
       
-      .status-bar {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 2rem;
-        flex-wrap: wrap;
+      .status-box {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 20px;
       }
       
-      .status-card {
-        flex: 1;
-        min-width: 200px;
-        background: var(--bg-card);
-        border-radius: 12px;
-        padding: 1.25rem;
-        border: 1px solid var(--border);
-        box-shadow: var(--shadow);
+      .status-box h3 {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
       }
       
-      .status-card .label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-muted);
-        margin-bottom: 0.5rem;
-      }
-      
-      .status-card .value {
-        font-size: 1.25rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+      .status-item {
+        display: inline-block;
+        margin-right: 30px;
+        margin-bottom: 5px;
       }
       
       .status-indicator {
+        display: inline-block;
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: var(--danger);
-        animation: pulse 2s infinite;
+        background: #e74c3c;
+        margin-right: 5px;
       }
       
-      .status-indicator.online {
-        background: var(--success);
-      }
-      
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+      .status-indicator.ok {
+        background: #27ae60;
       }
       
       .card {
-        background: var(--bg-card);
-        border-radius: 16px;
-        border: 1px solid var(--border);
-        box-shadow: var(--shadow);
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 5px;
         overflow: hidden;
       }
       
       .card-header {
+        background: #f8f9fa;
+        padding: 15px;
+        border-bottom: 1px solid #ddd;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid var(--border);
       }
       
-      .card-title {
-        font-size: 1.125rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-      
-      .card-title span {
-        font-size: 1.25rem;
+      .card-header h2 {
+        font-size: 18px;
+        color: #333;
       }
       
       .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1.25rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      
-      .btn-primary {
-        background: var(--primary);
+        background: #3498db;
         color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
       }
       
-      .btn-primary:hover {
-        background: var(--primary-dark);
-        transform: translateY(-1px);
-      }
-      
-      .btn-primary:active {
-        transform: translateY(0);
+      .btn:hover {
+        background: #2980b9;
       }
       
       .items-list {
@@ -177,154 +106,92 @@
       }
       
       .item {
-        display: flex;
-        align-items: center;
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid var(--border);
-        transition: background 0.2s;
+        padding: 15px;
+        border-bottom: 1px solid #eee;
       }
       
       .item:last-child {
         border-bottom: none;
       }
       
-      .item:hover {
-        background: var(--bg-hover);
-      }
-      
       .item-id {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        background: var(--primary);
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 0.875rem;
-        margin-right: 1rem;
-        flex-shrink: 0;
-      }
-      
-      .item-content {
-        flex: 1;
+        display: inline-block;
+        background: #3498db;
+        color: white;
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        text-align: center;
+        line-height: 28px;
+        font-size: 14px;
+        margin-right: 12px;
       }
       
       .item-name {
-        font-weight: 500;
-        margin-bottom: 0.25rem;
+        font-weight: bold;
       }
       
-      .item-description {
-        font-size: 0.875rem;
-        color: var(--text-muted);
+      .item-desc {
+        color: #666;
+        font-size: 14px;
+        margin-top: 4px;
+        margin-left: 40px;
       }
       
-      .empty-state {
+      .empty {
+        padding: 40px;
         text-align: center;
-        padding: 3rem;
-        color: var(--text-muted);
-      }
-      
-      .empty-state span {
-        font-size: 3rem;
-        display: block;
-        margin-bottom: 1rem;
+        color: #666;
       }
       
       .loading {
-        display: flex;
-        justify-content: center;
-        padding: 2rem;
-      }
-      
-      .spinner {
-        width: 32px;
-        height: 32px;
-        border: 3px solid var(--border);
-        border-top-color: var(--primary);
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      
-      @keyframes spin {
-        to { transform: rotate(360deg); }
+        padding: 40px;
+        text-align: center;
+        color: #666;
       }
       
       footer {
         text-align: center;
-        margin-top: 3rem;
-        padding-top: 2rem;
-        border-top: 1px solid var(--border);
-        color: var(--text-muted);
-        font-size: 0.875rem;
+        margin-top: 30px;
+        color: #999;
+        font-size: 13px;
       }
       
       footer a {
-        color: var(--primary);
-        text-decoration: none;
-      }
-      
-      footer a:hover {
-        text-decoration: underline;
+        color: #3498db;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <header>
-        <div class="logo">🐳</div>
-        <h1>TD Docker Dashboard</h1>
-        <p class="subtitle">Application conteneurisée — FastAPI + PostgreSQL + Nginx</p>
-      </header>
+      <h1>🐳 TD Docker</h1>
+      <p class="subtitle">Application conteneurisée - FastAPI / PostgreSQL / Nginx</p>
       
-      <div class="status-bar">
-        <div class="status-card">
-          <div class="label">Statut API</div>
-          <div class="value">
-            <div class="status-indicator" id="api-indicator"></div>
-            <span id="api-status">Connexion...</span>
-          </div>
+      <div class="status-box">
+        <h3>État des services</h3>
+        <div class="status-item">
+          <span class="status-indicator" id="api-indicator"></span>
+          <span>API : </span><span id="api-status">Chargement...</span>
         </div>
-        <div class="status-card">
-          <div class="label">Base de données</div>
-          <div class="value">
-            <div class="status-indicator" id="db-indicator"></div>
-            <span id="db-status">Vérification...</span>
-          </div>
-        </div>
-        <div class="status-card">
-          <div class="label">Items</div>
-          <div class="value">
-            <span id="items-count">—</span>
-          </div>
+        <div class="status-item">
+          <span class="status-indicator" id="db-indicator"></span>
+          <span>Base de données : </span><span id="db-status">Chargement...</span>
         </div>
       </div>
       
       <div class="card">
         <div class="card-header">
-          <div class="card-title">
-            <span>📦</span>
-            Liste des Items
-          </div>
-          <button class="btn btn-primary" id="refresh">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
-              <path d="M21 3v5h-5"/>
-            </svg>
-            Actualiser
-          </button>
+          <h2>Liste des items (<span id="items-count">0</span>)</h2>
+          <button class="btn" id="refresh">Actualiser</button>
         </div>
         <div id="items-container">
-          <div class="loading">
-            <div class="spinner"></div>
-          </div>
+          <div class="loading">Chargement...</div>
         </div>
       </div>
       
       <footer>
-        <p>TD Docker — EPSI SN3 • Décembre 2025</p>
-        <p>Pierre FAGOT • <a href="https://github.com/pfgt34/tp_final_docker" target="_blank">GitHub</a></p>
+        <p>Pierre FAGOT - EPSI SN3 - Décembre 2025</p>
+        <p><a href="https://github.com/pfgt34/tp_final_docker" target="_blank">Voir sur GitHub</a></p>
       </footer>
     </div>
     <script src="/app.js"></script>

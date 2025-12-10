@@ -1,117 +1,68 @@
-// État de l'application
-let isLoading = false;
-
-// Éléments du DOM
-const apiIndicator = document.getElementById('api-indicator');
-const apiStatus = document.getElementById('api-status');
-const dbIndicator = document.getElementById('db-indicator');
-const dbStatus = document.getElementById('db-status');
-const itemsCount = document.getElementById('items-count');
-const itemsContainer = document.getElementById('items-container');
-const refreshBtn = document.getElementById('refresh');
-
 // Récupérer le statut de l'API
 async function fetchStatus() {
   try {
     const response = await fetch('/api/status');
     const data = await response.json();
     
-    apiIndicator.classList.add('online');
-    apiStatus.textContent = data.status === 'OK' ? 'En ligne' : data.status;
-    
+    document.getElementById('api-indicator').classList.add('ok');
+    document.getElementById('api-status').textContent = 'OK';
     return true;
   } catch (error) {
-    apiIndicator.classList.remove('online');
-    apiStatus.textContent = 'Hors ligne';
+    document.getElementById('api-indicator').classList.remove('ok');
+    document.getElementById('api-status').textContent = 'Erreur';
     return false;
   }
 }
 
-// Récupérer les items
+// Récupérer les items depuis l'API
 async function fetchItems() {
-  if (isLoading) return;
-  isLoading = true;
-  
-  // Afficher le loader
-  itemsContainer.innerHTML = `
-    <div class="loading">
-      <div class="spinner"></div>
-    </div>
-  `;
+  document.getElementById('items-container').innerHTML = '<div class="loading">Chargement...</div>';
   
   try {
     const response = await fetch('/api/items');
     const items = await response.json();
     
     // Mettre à jour le statut DB
-    dbIndicator.classList.add('online');
-    dbStatus.textContent = 'Connectée';
+    document.getElementById('db-indicator').classList.add('ok');
+    document.getElementById('db-status').textContent = 'OK';
     
     // Mettre à jour le compteur
-    itemsCount.textContent = items.length;
+    document.getElementById('items-count').textContent = items.length;
     
     // Afficher les items
     if (items.length === 0) {
-      itemsContainer.innerHTML = `
-        <div class="empty-state">
-          <span>📭</span>
-          <p>Aucun item trouvé</p>
-        </div>
-      `;
+      document.getElementById('items-container').innerHTML = '<div class="empty">Aucun item trouvé</div>';
     } else {
-      const itemsHTML = items.map(item => `
-        <li class="item">
-          <div class="item-id">${item.id}</div>
-          <div class="item-content">
-            <div class="item-name">${escapeHtml(item.name)}</div>
-            <div class="item-description">${escapeHtml(item.description || 'Aucune description')}</div>
-          </div>
-        </li>
-      `).join('');
-      
-      itemsContainer.innerHTML = `<ul class="items-list">${itemsHTML}</ul>`;
+      let html = '<ul class="items-list">';
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        html += '<li class="item">';
+        html += '<span class="item-id">' + item.id + '</span>';
+        html += '<span class="item-name">' + item.name + '</span>';
+        html += '<div class="item-desc">' + (item.description || 'Pas de description') + '</div>';
+        html += '</li>';
+      }
+      html += '</ul>';
+      document.getElementById('items-container').innerHTML = html;
     }
   } catch (error) {
     console.error('Erreur:', error);
-    dbIndicator.classList.remove('online');
-    dbStatus.textContent = 'Erreur';
-    itemsCount.textContent = '—';
-    
-    itemsContainer.innerHTML = `
-      <div class="empty-state">
-        <span>⚠️</span>
-        <p>Impossible de charger les items</p>
-      </div>
-    `;
-  } finally {
-    isLoading = false;
+    document.getElementById('db-indicator').classList.remove('ok');
+    document.getElementById('db-status').textContent = 'Erreur';
+    document.getElementById('items-container').innerHTML = '<div class="empty">Erreur de chargement</div>';
   }
 }
 
-// Échapper le HTML pour éviter les XSS
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+// Rafraîchir les données
+function refresh() {
+  fetchStatus();
+  fetchItems();
 }
 
-// Rafraîchir toutes les données
-async function refresh() {
-  refreshBtn.disabled = true;
-  refreshBtn.style.opacity = '0.7';
-  
-  await fetchStatus();
-  await fetchItems();
-  
-  refreshBtn.disabled = false;
-  refreshBtn.style.opacity = '1';
-}
-
-// Event listeners
-refreshBtn.addEventListener('click', refresh);
+// Bouton actualiser
+document.getElementById('refresh').addEventListener('click', function() {
+  refresh();
+});
 
 // Chargement initial
 refresh();
-
-// Auto-refresh toutes les 30 secondes
-setInterval(refresh, 30000);
