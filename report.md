@@ -10,32 +10,15 @@ Dans le cadre de ce TD, j'ai développé une application web conteneurisée comp
 
 J'ai choisi de séparer l'application en trois conteneurs distincts pour respecter le principe de séparation des responsabilités :
 
-```
-         ┌─────────────┐
-         │   Frontend  │ ← Port 8080 (accès utilisateur)
-         │   (Nginx)   │
-         └──────┬──────┘
-                │ proxy /api
-                ▼
-         ┌─────────────┐
-         │     API     │ ← Port 8000
-         │  (FastAPI)  │
-         └──────┬──────┘
-                │
-                ▼
-         ┌─────────────┐
-         │  Database   │ ← Port 5432 (interne)
-         │ (PostgreSQL)│
-         └─────────────┘
-```
+**Le frontend** est un site statique servi par Nginx. J'ai configuré Nginx en tant que reverse proxy : quand le navigateur fait une requête vers `/api/...`, Nginx la redirige vers le conteneur API. Ça permet d'éviter les problèmes de CORS et de n'exposer qu'un seul point d'entrée. Il est accessible sur le port 8080.
 
-**Le frontend** est un site statique servi par Nginx. J'ai configuré Nginx en tant que reverse proxy : quand le navigateur fait une requête vers `/api/...`, Nginx la redirige vers le conteneur API. Ça permet d'éviter les problèmes de CORS et de n'exposer qu'un seul point d'entrée.
-
-**L'API** est développée avec FastAPI, un framework Python que je trouve assez simple à prendre en main. Elle expose deux routes :
+**L'API** est développée avec FastAPI, un framework Python que je trouve assez simple à prendre en main. Elle tourne sur le port 8000 et expose deux routes :
 - `/status` : renvoie juste "OK" pour vérifier que l'API fonctionne
 - `/items` : récupère la liste des items stockés en base
 
-**La base de données** utilise PostgreSQL. J'ai mis en place un script d'initialisation qui crée la table et insère quelques données de test au premier démarrage.
+**La base de données** utilise PostgreSQL sur le port 5432 (accessible uniquement en interne). J'ai mis en place un script d'initialisation qui crée la table et insère quelques données de test au premier démarrage.
+
+En résumé, l'utilisateur arrive sur le frontend (port 8080), le JavaScript fait des appels vers `/api/...`, Nginx redirige ces requêtes vers l'API qui va chercher les données dans PostgreSQL.
 
 ---
 
