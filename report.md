@@ -1,191 +1,197 @@
-# Rapport de synthèse — TD Application Conteneurisée
+# Rapport de projet — TD Docker
 
-## 1. Architecture
+## Introduction
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Réseau Docker                            │
-│  ┌──────────┐      ┌──────────┐      ┌──────────────────────┐   │
-│  │   db     │◄────▶│   api    │◄────▶│       front          │   │
-│  │ Postgres │      │ FastAPI  │      │ Nginx (reverse proxy)│   │
-│  │ :5432    │      │ :8000    │      │ :80 → exposé :8080   │   │
-│  └──────────┘      └──────────┘      └──────────────────────┘   │
-│       │                                                          │
-│       ▼                                                          │
-│  [volume db_data]                                                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Services
-
-| Service | Image / Build | Rôle |
-|---------|---------------|------|
-| **db** | `postgres:15-alpine` | Base de données PostgreSQL, initialisée via `init.sql` |
-| **api** | Build local `./api` | API Python (FastAPI) exposant `/status` et `/items` |
-| **front** | Build local `./front` | Site statique + reverse proxy Nginx vers l'API |
-
-### Flux de données
-1. L'utilisateur accède à `http://localhost:8080` (front).
-2. Le JavaScript appelle `/api/status` et `/api/items`.
-3. Nginx reverse-proxy ces requêtes vers `http://api:8000/`.
-4. L'API interroge PostgreSQL et renvoie les données JSON.
+Dans le cadre de ce TD, j'ai développé une application web conteneurisée composée de trois services : une API en Python, une base de données PostgreSQL et un frontend statique. L'objectif était de mettre en pratique les concepts vus en cours sur Docker et Docker Compose, tout en respectant les bonnes pratiques de sécurité et d'optimisation.
 
 ---
 
-## 2. Commandes clés
+## 1. Présentation de l'architecture
 
-```bash
-# Construire les images
-docker compose build
+J'ai choisi de séparer l'application en trois conteneurs distincts pour respecter le principe de séparation des responsabilités :
 
-# Valider la configuration Compose
-docker compose config
-
-# Démarrer la stack en arrière-plan
-docker compose up -d
-
-# Voir l'état des services
-docker compose ps
-
-# Consulter les logs
-docker compose logs -f api
-
-# Arrêter et nettoyer (avec volumes)
-docker compose down -v
-
-# Scanner une image (Docker Scout ou Trivy)
-docker scout quickview tp_final-api
-# ou
-trivy image tp_final-api
 ```
+         ┌─────────────┐
+         │   Frontend  │ ← Port 8080 (accès utilisateur)
+         │   (Nginx)   │
+         └──────┬──────┘
+                │ proxy /api
+                ▼
+         ┌─────────────┐
+         │     API     │ ← Port 8000
+         │  (FastAPI)  │
+         └──────┬──────┘
+                │
+                ▼
+         ┌─────────────┐
+         │  Database   │ ← Port 5432 (interne)
+         │ (PostgreSQL)│
+         └─────────────┘
+```
+
+**Le frontend** est un site statique servi par Nginx. J'ai configuré Nginx en tant que reverse proxy : quand le navigateur fait une requête vers `/api/...`, Nginx la redirige vers le conteneur API. Ça permet d'éviter les problèmes de CORS et de n'exposer qu'un seul point d'entrée.
+
+**L'API** est développée avec FastAPI, un framework Python que je trouve assez simple à prendre en main. Elle expose deux routes :
+- `/status` : renvoie juste "OK" pour vérifier que l'API fonctionne
+- `/items` : récupère la liste des items stockés en base
+
+**La base de données** utilise PostgreSQL. J'ai mis en place un script d'initialisation qui crée la table et insère quelques données de test au premier démarrage.
 
 ---
 
-## 3. Bonnes pratiques suivies
+## 2. Ce que j'ai appris sur les Dockerfiles
 
-### 3.1 Dockerfile multi-étapes
-- **API** : étape `builder` installe les dépendances dans `/install`, étape finale copie uniquement le nécessaire.
-- **Front** : étape `builder` copie les sources, étape finale utilise `nginx:alpine` (~40 MB).
+### Les builds multi-étapes
 
-**Économie** : l'image API pèse ~180 MB au lieu de ~1 GB si on gardait les outils de build.
+Au début, mes images étaient assez volumineuses. J'ai découvert les builds multi-étapes qui permettent de séparer la phase de build de la phase d'exécution. Concrètement, pour l'API :
 
-### 3.2 Images légères
-- Base `python:3.11-slim` pour l'API.
-- Base `nginx:alpine` pour le front.
-- Base `postgres:15-alpine` pour la DB.
+```dockerfile
+# Étape 1 : on installe les dépendances
+FROM python:3.11-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --prefix=/install -r requirements.txt
 
-### 3.3 `.dockerignore`
-Fichiers exclus : `__pycache__`, `.env`, `node_modules`, `*.log`, etc.
+# Étape 2 : on copie juste ce dont on a besoin
+FROM python:3.11-slim
+COPY --from=builder /install /usr/local
+COPY . /app
+```
 
-### 3.4 Utilisateur non-root
+Résultat : mon image API fait environ 250 Mo au lieu de plus d'1 Go si j'avais gardé tous les outils de build.
+
+### L'utilisateur non-root
+
+J'ai appris qu'il ne faut jamais faire tourner un conteneur en root. Du coup, j'ai créé un utilisateur dédié :
+
 ```dockerfile
 RUN groupadd -r app && useradd -r -g app app
 USER app
 ```
-Les processus tournent avec un compte sans privilèges.
 
-### 3.5 Sécurité Compose
+C'est une bonne habitude à prendre pour limiter les dégâts en cas de faille de sécurité.
+
+### Le fichier .dockerignore
+
+Comme le `.gitignore`, ça permet d'exclure des fichiers du contexte de build. J'y ai mis `__pycache__`, `.env`, les logs... Ça accélère le build et évite de copier des fichiers sensibles dans l'image.
+
+---
+
+## 3. Configuration avec Docker Compose
+
+Mon fichier `docker-compose.yml` orchestre les trois services. Voici les points importants :
+
+### Les healthchecks
+
+J'ai galéré un moment avec les healthchecks. Au début j'utilisais `curl` mais il n'est pas installé dans les images slim. J'ai fini par utiliser Python directement pour l'API :
+
 ```yaml
-cap_drop:
-  - ALL
+healthcheck:
+  test: ["CMD-SHELL", "python -c \"import http.client; ...\""]
+  interval: 5s
+  timeout: 5s
+  retries: 5
+```
+
+Grâce à `depends_on` avec `condition: service_healthy`, Compose attend que la base soit prête avant de lancer l'API, et que l'API soit prête avant de lancer le front.
+
+### Les variables d'environnement
+
+Toute la configuration (host de la BDD, mot de passe, etc.) est externalisée dans des variables d'environnement. J'ai aussi créé un fichier `.env` à la racine pour centraliser les valeurs.
+
+### La persistance des données
+
+Le volume `db_data` permet de conserver les données même si on supprime le conteneur PostgreSQL. C'est important pour ne pas perdre les données à chaque redémarrage.
+
+---
+
+## 4. Sécurité
+
+En plus de l'utilisateur non-root, j'ai ajouté quelques options de sécurité dans Compose :
+
+```yaml
 security_opt:
   - no-new-privileges:true
-read_only: true
-tmpfs:
-  - /tmp
+cap_drop:
+  - ALL
 ```
 
-### 3.6 Healthchecks
-Chaque service dispose d'un healthcheck pour que Compose attende la disponibilité avant de démarrer les dépendants.
+J'ai aussi fait un scan de vulnérabilités avec Docker Scout. Le résultat :
+- 0 vulnérabilités critiques
+- 3 vulnérabilités hautes (liées à l'image Python de base)
+- Quelques moyennes et basses
 
-### 3.7 Variables d'environnement
-- Fichier `.env` pour centraliser la configuration.
-- Section `environment` dans Compose pour passer les variables aux conteneurs.
+Pour les corriger, il faudrait mettre à jour l'image de base régulièrement.
+
+Concernant la signature des images, j'ai poussé mes images sur Docker Hub et tenté d'activer Docker Content Trust. Les clés ont été générées mais la signature a échoué à cause d'un bug connu. J'ai quand même documenté la procédure dans le script d'automatisation.
 
 ---
 
-## 4. Signature et scan des images
+## 5. Automatisation
 
-### Docker Content Trust (signature)
+J'ai créé un script `build_and_deploy.sh` (et sa version PowerShell) qui automatise tout le processus :
+
+1. Build des images
+2. Validation de la config Compose
+3. Scan de sécurité (optionnel)
+4. Déploiement de la stack
+
+Pour l'utiliser :
 ```bash
-export DOCKER_CONTENT_TRUST=1
-docker push registry.example.com/tp_final-api:latest
+./scripts/build_and_deploy.sh
 ```
-Nécessite un registre et des clés de signature configurées.
-
-### Scan de vulnérabilités
-```bash
-# Avec Docker Scout (intégré Docker Desktop)
-docker scout cves tp_final-api
-
-# Avec Trivy (open source)
-trivy image tp_final-api
-```
-
-**Interprétation** : corriger les CVE critiques/élevées en mettant à jour les images de base ou les dépendances.
-
----
-
-## 5. Script d'automatisation
-
-Le script `scripts/build_and_deploy.sh` (ou `.ps1` pour Windows) :
-1. Construit les images (`docker compose build`).
-2. Valide la configuration (`docker compose config`).
-3. (Optionnel) Scanne les images.
-4. (Optionnel) Pousse les images signées vers un registre.
-5. Déploie la stack (`docker compose up -d`).
 
 ---
 
 ## 6. Difficultés rencontrées
 
-| Problème | Solution |
-|----------|----------|
-| Healthcheck API échouait (pas de `curl` dans l'image slim) | Utilisation de Python natif pour le check HTTP |
-| Nginx ne démarre pas en non-root sur le port 80 | L'image `nginx:alpine` gère cela nativement ; on garde `USER app` pour les fichiers |
-| Docker Content Trust complexe sans registre privé | Documentation dans le script, étapes conditionnelles |
+**Le healthcheck de l'API** : comme je l'ai dit, `curl` n'était pas disponible. J'ai passé du temps à chercher une solution avant de penser à utiliser Python qui est forcément présent dans l'image.
+
+**Nginx en read-only** : j'avais mis `read_only: true` sur le conteneur front pour la sécurité, mais Nginx a besoin d'écrire dans `/var/cache/nginx`. J'ai dû retirer cette option pour le front.
+
+**La signature Docker Content Trust** : c'est plus complexe que prévu. Il faut un registre, des clés, et j'ai eu un bug au moment de la signature. J'ai préféré documenter la procédure plutôt que de bloquer dessus.
 
 ---
 
-## 7. Améliorations possibles
+## 7. Pour aller plus loin
 
-- **CI/CD** : GitHub Actions ou GitLab CI pour build/test/push automatiques.
-- **Scaling** : `docker compose up -d --scale api=3` + load balancer.
-- **Monitoring** : ajouter Prometheus + Grafana pour les métriques.
-- **Secrets** : utiliser Docker Secrets ou Vault au lieu de variables en clair.
-- **HTTPS** : Traefik ou Caddy en front avec certificats Let's Encrypt.
+Si j'avais plus de temps, j'aurais aimé ajouter :
+
+- **Un pipeline CI/CD** avec GitHub Actions pour automatiser les builds à chaque push
+- **Du monitoring** avec Prometheus et Grafana pour visualiser les métriques
+- **Du HTTPS** avec Traefik ou un certificat Let's Encrypt
+- **Plus de fonctionnalités** sur l'API : ajout/suppression d'items, authentification...
 
 ---
 
-## 8. Structure du dépôt
+## 8. Commandes utiles
 
-```
-tp_final/
-├── .env                  # Variables d'environnement
-├── .gitignore
-├── docker-compose.yml
-├── README.md
-├── report.md             # Ce rapport
-├── api/
-│   ├── .dockerignore
-│   ├── Dockerfile        # Multi-étapes, user non-root
-│   ├── main.py           # FastAPI /status /items
-│   └── requirements.txt
-├── db/
-│   └── init.sql          # Schéma + données initiales
-├── front/
-│   ├── .dockerignore
-│   ├── Dockerfile        # Multi-étapes, nginx:alpine
-│   ├── index.html
-│   ├── app.js
-│   └── nginx.conf        # Reverse proxy /api
-└── scripts/
-    ├── build_and_deploy.sh
-    └── build_and_deploy.ps1
+```bash
+# Lancer la stack
+docker compose up -d
+
+# Voir les logs
+docker compose logs -f
+
+# Arrêter tout
+docker compose down
+
+# Tout supprimer (y compris les données)
+docker compose down -v
+
+# Reconstruire les images
+docker compose build --no-cache
 ```
 
 ---
 
-**Auteur** : Pierre FAGOT  
-**Date** : Décembre 2025  
-**Module** : Docker — EPSI SN3
+## Conclusion
+
+Ce TD m'a permis de bien comprendre comment fonctionne Docker en pratique. J'ai appris à optimiser mes images, à orchestrer plusieurs services avec Compose, et à appliquer des bonnes pratiques de sécurité. Le plus formateur a été de résoudre les problèmes un par un (healthchecks, permissions, etc.) car ça m'a obligé à vraiment comprendre ce qui se passait.
+
+Le projet est disponible sur GitHub : https://github.com/pfgt34/tp_final_docker
+
+---
+
+**Pierre FAGOT**  
+EPSI SN3 — Décembre 2025
